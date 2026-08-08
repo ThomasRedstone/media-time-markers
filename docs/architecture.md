@@ -168,6 +168,29 @@ covered by the existing `http` host service) plus, eventually, audio fingerprint
 hit this same constraint and need its own host function or a bundled fingerprinting library that
 actually compiles under TinyGo/wasip1.
 
+## Phase 3b build notes (2026-08-08) — crowdsourced-lookup plugin built, not fully verified live
+
+`plugins/examples/media-time-markers-lookup` in navidrome/navidrome implements the read side of
+this design: fingerprint (new `Fingerprint` host function, same server-side-ffmpeg-style shape
+as `SilenceDetect`) → AcoustID lookup → fetch `data/<uuid[0:2]>/<uuid[2:4]>/<uuid>.json` via
+jsDelivr → map to markers. Matches this doc's schema and read-path shape exactly (per-UUID file
+layout, jsDelivr as the CDN, `source: crowdsourced:<repo>` provenance convention).
+
+**Two things stopped a real live end-to-end verification this session, both outside the
+navidrome/navidrome repo's control**: no `ACOUSTID_API_KEY` was available in-session (it lives
+in the user's environment from an earlier session, not persisted anywhere this session could
+read), and jsDelivr only mirrors **public** GitHub repos — this repo is still private. So the
+plugin's AcoustID-response parsing, marker-file parsing, and 404/no-match handling were verified
+against real-shaped fixtures (including the real Chevelle marker file's exact JSON) via mocks,
+not a live network round-trip. **Follow-up once both are available**: run it for real against a
+real fingerprinted track from `/home/tom/music` and confirm a marker actually comes back.
+
+**Deferred by design, not by omission**: the bulk-index-sync read path this doc describes above
+("Read path: bulk sync, not per-track queries") isn't built yet — v1 does a fingerprint+lookup+
+fetch per track, every time. Worth revisiting once real scan-time usage shows whether the extra
+per-track round-trips actually matter at library scale; the host `Cache` service is the natural
+place to hold a fetched index between calls if/when it does.
+
 ## Phase 2 build notes (2026-08-08) — resolved while implementing against navidrome/navidrome
 
 Core (migration → model → persistence → plugin capability → scan invocation → CRUD endpoint →

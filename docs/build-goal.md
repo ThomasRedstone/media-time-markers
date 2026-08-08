@@ -169,10 +169,18 @@ Track its migration (detect the new extension via `getOpenSubsonicExtensions`, m
       Verified 2026-08-08 via a real generated audio fixture (2s silence/3s tone/1.5s silence)
       and a real ffmpeg subprocess, not a synthetic mock — see
       plugins/media_marker_provider_integration_test.go in the navidrome/navidrome repo.
-- [ ] Crowdsourced-lookup plugin (3b) built and verified against `media-time-markers` real data.
+- [x] Crowdsourced-lookup plugin (3b) built; **partially verified** 2026-08-08.
+      AcoustID-response parsing, marker-file parsing, and 404/no-match handling verified via
+      real-shaped fixtures and testify mocks (no live network needed). NOT yet verified against
+      the real AcoustID API + real jsDelivr-served media-time-markers data end-to-end — blocked
+      on two things outside this repo: an AcoustID API key being available in-session, and the
+      media-time-markers repo being public (jsDelivr only mirrors public repos). Do that real
+      end-to-end pass once both are available.
 - [x] `docs/architecture.md` updated with anything the build proved wrong or underspecified.
       See "Phase 2 build notes" section there.
-- [ ] Nothing pushed/opened publicly without an explicit go-ahead at that point.
+- [x] Nothing pushed/opened publicly without an explicit go-ahead at that point (true as of
+      2026-08-08 — media-time-markers push was explicitly approved and kept private;
+      navidrome/navidrome's feat/media-markers branch stays local, no upstream discussion opened).
 
 ## Explicitly deferred (do not build unless asked)
 
