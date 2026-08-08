@@ -1,6 +1,8 @@
 {
   "schema_version": 1,
   "generated_at": null,
-  "count": 0,
-  "acoustids": []
+  "count": 1,
+  "acoustids": [
+    "5a6b2f12-2f76-4184-a089-68b53a30e6ee"
+  ]
 }
