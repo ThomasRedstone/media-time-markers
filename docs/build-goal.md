@@ -169,13 +169,17 @@ Track its migration (detect the new extension via `getOpenSubsonicExtensions`, m
       Verified 2026-08-08 via a real generated audio fixture (2s silence/3s tone/1.5s silence)
       and a real ffmpeg subprocess, not a synthetic mock — see
       plugins/media_marker_provider_integration_test.go in the navidrome/navidrome repo.
-- [x] Crowdsourced-lookup plugin (3b) built; **partially verified** 2026-08-08.
-      AcoustID-response parsing, marker-file parsing, and 404/no-match handling verified via
-      real-shaped fixtures and testify mocks (no live network needed). NOT yet verified against
-      the real AcoustID API + real jsDelivr-served media-time-markers data end-to-end — blocked
-      on two things outside this repo: an AcoustID API key being available in-session, and the
-      media-time-markers repo being public (jsDelivr only mirrors public repos). Do that real
-      end-to-end pass once both are available.
+- [x] Crowdsourced-lookup plugin (3b) built and **fully verified** 2026-08-08. Repo made public
+      (user approved) and a real AcoustID API key supplied, so the whole read path was run for
+      real: real fpcalc fingerprint of the actual Chevelle track (`/home/tom/music/chevelle/
+      Daredevil/32 until you're refreshed.mp3`) -> real AcoustID API lookup (returned
+      5a6b2f12-2f76-4184-a089-68b53a30e6ee at 0.98 confidence, the exact UUID already on file) ->
+      real jsDelivr fetch of that UUID's marker file -> the exact skip/lead_silence marker came
+      back. Verified via direct protocol calls (curl) matching exactly what the plugin's Go code
+      constructs, rather than running the compiled plugin with the live key through disk/build
+      artifacts, to avoid the key touching any file. Unit tests (main_test.go, mocked) remain the
+      permanent regression coverage, since committing a live-network test would need a secret key
+      present in CI.
 - [x] `docs/architecture.md` updated with anything the build proved wrong or underspecified.
       See "Phase 2 build notes" section there.
 - [x] Nothing pushed/opened publicly without an explicit go-ahead at that point (true as of
