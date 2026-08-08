@@ -142,6 +142,47 @@ sitting on an issue thread for weeks before starting. New order:
 4. If upstream doesn't want it, the personal fork carrying schema + interface + endpoint diff is
    still small and stays viable indefinitely.
 
+## Phase 2 build notes (2026-08-08) — resolved while implementing against navidrome/navidrome
+
+Core (migration → model → persistence → plugin capability → scan invocation → CRUD endpoint →
+extension → additive response fields) is built and tested on branch `feat/media-markers`. A few
+things this spec left open got resolved during the build; recording them here rather than
+letting them live only in commit messages:
+
+- **No AcoustID/Chromaprint fingerprinting exists anywhere in core's scan pipeline.** Confirmed
+  by searching the scanner package before wiring up invocation. Fingerprinting (for the
+  crowdsourced-lookup plugin, Phase 3b) is entirely a plugin-side concern — core has nothing to
+  supply and doesn't need to change to support it.
+- **Every installed `MediaMarkerProvider` plugin runs and contributes its markers** — this is
+  NOT a first-match-wins priority list like metadata agent lookup. A local silence-detector and
+  a crowdsourced-lookup plugin can find genuinely complementary markers on the same track (one's
+  silence spans, the other's spoken-intro spans), so both should be allowed to contribute. There
+  is no enable/priority config yet (unlike `conf.Server.Agents`/`LyricsPriority`) — installing a
+  plugin with this capability is what opts a server in, matching how WebSocket/Scheduler
+  callback plugins run automatically for every installed plugin with that capability. Worth
+  revisiting if a real conflict between two providers' markers ever actually happens.
+- **Scan-time invocation happens after `persistChanges`' write transaction commits**, not inside
+  it — a track's DB-assigned ID isn't set until `mediaFileRepository.Put` runs inside that
+  transaction, and plugin calls (potentially slow WASM invocations) shouldn't run inside a held
+  -open write transaction anyway. A track's previous plugin-sourced markers are cleared before
+  writing fresh ones on each scan that touches it, so re-scanning a re-tagged file doesn't
+  accumulate duplicate rows; manually-entered markers (`source: manual`) are never touched by
+  this.
+- **The manual CRUD endpoint** is `getMediaMarkers` (any authenticated user) plus
+  `create`/`update`/`deleteMediaMarker` (admin only — the table is global, not per-user).
+  `updateMediaMarker` always stamps `source: manual` on save: once a human corrects a marker,
+  it's a manual entry regardless of where it originally came from.
+- **Additive response fields landed on `getSong` and `getAlbum`/`getMusicDirectory`** (the two
+  the brief named explicitly), via a `MediaMarkers` field on `OpenSubsonicChild` populated by one
+  batched query per response (not per-song) to avoid an N+1 on album song lists. Extending the
+  same helper to search/playlists/bookmarks/nowPlaying song lists is straightforward and
+  deliberately deferred rather than done as a first pass everywhere.
+
+Nothing here argues the core data model (`media_marker` table shape, global-not-per-user,
+`kind` as an open namespaced string) was wrong — it held up. What was underspecified was mostly
+the *invocation* side (when/how often plugins run, how multiple providers combine), now resolved
+above.
+
 ## Sources
 
 Navidrome plugin docs · Plugin capabilities · getBookmarks entry-shape bug #1099 ·

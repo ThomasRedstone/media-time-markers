@@ -35,7 +35,8 @@ validator, index builder, `submit.js` CLI, CI workflows. `ACOUSTID_API_KEY` env 
 https://acoustid.org/my-applications if lost.
 
 Remaining for this phase:
-- [ ] Push to GitHub (**ask first** — first time this repo goes public).
+- [x] Push to GitHub (**ask first** — first time this repo goes public). Done 2026-08-08,
+      kept **private** (asked and confirmed, not public).
 - [ ] Add real markers for tracks as they get manually reviewed (replace/remove the placeholder
       `skip/lead_silence 0-500ms` entry on the Chevelle smoke-test track with a real value once
       that track's actually reviewed).
@@ -157,15 +158,17 @@ Track its migration (detect the new extension via `getOpenSubsonicExtensions`, m
 
 ## Definition of done for this brief
 
-- [ ] `media_marker` table exists, migration tested.
-- [ ] `MediaMarkerProvider` plugin capability exists, documented, regenerated via `ndpgen`.
-- [ ] Scan pipeline invokes enabled `MediaMarkerProvider` plugins per track and persists results.
-- [ ] Manual CRUD endpoint exists and is tested.
-- [ ] `getOpenSubsonicExtensions` advertises the new capability.
-- [ ] `getSong`/`getAlbum`/etc. responses carry markers additively.
+- [x] `media_marker` table exists, migration tested.
+- [x] `MediaMarkerProvider` plugin capability exists, documented, regenerated via `ndpgen`.
+- [x] Scan pipeline invokes enabled `MediaMarkerProvider` plugins per track and persists results.
+- [x] Manual CRUD endpoint exists and is tested.
+- [x] `getOpenSubsonicExtensions` advertises the new capability.
+- [x] `getSong`/`getAlbum`/etc. responses carry markers additively (getSong + getAlbum/
+      getMusicDirectory done; search/playlists/bookmarks/nowPlaying deferred, same helper reusable).
 - [ ] Local silence-detection plugin (3a) built and verified against a real hidden-track album.
 - [ ] Crowdsourced-lookup plugin (3b) built and verified against `media-time-markers` real data.
-- [ ] `docs/architecture.md` updated with anything the build proved wrong or underspecified.
+- [x] `docs/architecture.md` updated with anything the build proved wrong or underspecified.
+      See "Phase 2 build notes" section there.
 - [ ] Nothing pushed/opened publicly without an explicit go-ahead at that point.
 
 ## Explicitly deferred (do not build unless asked)
