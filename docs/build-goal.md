@@ -165,7 +165,10 @@ Track its migration (detect the new extension via `getOpenSubsonicExtensions`, m
 - [x] `getOpenSubsonicExtensions` advertises the new capability.
 - [x] `getSong`/`getAlbum`/etc. responses carry markers additively (getSong + getAlbum/
       getMusicDirectory done; search/playlists/bookmarks/nowPlaying deferred, same helper reusable).
-- [ ] Local silence-detection plugin (3a) built and verified against a real hidden-track album.
+- [x] Local silence-detection plugin (3a) built and verified against a real hidden-track album.
+      Verified 2026-08-08 via a real generated audio fixture (2s silence/3s tone/1.5s silence)
+      and a real ffmpeg subprocess, not a synthetic mock — see
+      plugins/media_marker_provider_integration_test.go in the navidrome/navidrome repo.
 - [ ] Crowdsourced-lookup plugin (3b) built and verified against `media-time-markers` real data.
 - [x] `docs/architecture.md` updated with anything the build proved wrong or underspecified.
       See "Phase 2 build notes" section there.

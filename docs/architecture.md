@@ -142,6 +142,32 @@ sitting on an issue thread for weeks before starting. New order:
 4. If upstream doesn't want it, the personal fork carrying schema + interface + endpoint diff is
    still small and stays viable indefinitely.
 
+## Phase 3a build notes (2026-08-08) — WASM plugins can't shell out to ffmpeg
+
+The build brief's Phase 3a plan ("wraps `ffmpeg -af silencedetect`, zero dependencies") was
+**wrong as written**: Navidrome's WASM plugins run in a pure sandbox (Extism/Wazero) with no
+subprocess/exec capability at all — confirmed by reading `plugins/README.md`'s security section
+and grepping the whole `plugins/host/` tree for anything exec-shaped. A plugin cannot spawn
+`ffmpeg`, or any other binary, under any permission.
+
+Resolved (user's explicit direction, see the three options weighed: new host function vs.
+pure-WASM audio decode vs. defer) by adding a new **`SilenceDetect` host function** —
+`plugins/host/silencedetect.go` in navidrome/navidrome — that runs ffmpeg server-side on the
+plugin's behalf, mirroring how `Artwork`/`Library` host functions already do server-side work
+plugins can't do themselves. The plugin supplies a library ID + library-relative path (never a
+host filesystem path); the host resolves and jails it the same way the WASM filesystem mount
+does (`filepath.IsLocal` escape check). Gated by a new `silencedetect` manifest permission that
+requires `library` with `filesystem: true` declared alongside it.
+
+This is worth remembering as a standing constraint for any future plugin idea in this project:
+**if a plugin needs to do real audio/media processing (decode, transcode, fingerprint, analyze),
+it needs a purpose-built host function — it cannot shell out, and pure-WASM decoding is a much
+bigger lift than it sounds** (TinyGo's stdlib/cgo limits rule out most existing decoders). The
+crowdsourced-lookup plugin (Phase 3b) is unaffected — it only needs outbound HTTP (already
+covered by the existing `http` host service) plus, eventually, audio fingerprinting, which will
+hit this same constraint and need its own host function or a bundled fingerprinting library that
+actually compiles under TinyGo/wasip1.
+
 ## Phase 2 build notes (2026-08-08) — resolved while implementing against navidrome/navidrome
 
 Core (migration → model → persistence → plugin capability → scan invocation → CRUD endpoint →
