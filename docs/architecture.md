@@ -232,6 +232,80 @@ Nothing here argues the core data model (`media_marker` table shape, global-not-
 the *invocation* side (when/how often plugins run, how multiple providers combine), now resolved
 above.
 
+## Production bug found + fixed (2026-08-08) — plugins never actually ran during real scans
+
+Discovered while trying to capture real marker data on the workstation against pulled podcast
+audio: after a full local end-to-end setup (plugin enabled, scan triggered), `media_marker`
+stayed empty. Root cause took a debug-print trace through `core/mediamarkers.GetMarkers` down to
+`scanner.CallScan` to find:
+
+- `conf.Server.DevExternalScanner` **defaults to `true`**, meaning `scanner/external.go`'s
+  `scannerExternal.scan()` re-execs the binary as `<exe> scan --nobanner --subprocess ...` for
+  **every** real scan trigger — startup, the filesystem watcher, HTTP-triggered (`startScan`),
+  scheduled. This is not a CLI-only code path; it's the universal production scan path.
+- That subprocess is handled by `cmd/scan.go`'s `runScanner()`, which was hardcoding
+  `scanner.CallScan(..., mediamarkers.New(nil), ...)` — a literal nil plugin loader. So
+  `MediaMarkerProvider` plugins ran only when a test called `scanner.New(...)` directly, which
+  nothing in production does.
+
+Fixed by threading a real `mediamarkers.MediaMarkers` through `CallScan` and having
+`runScanner()` build one from a real, started `plugins.Manager` when `conf.Server.Plugins.Enabled`
+is true. That hit a second, subtler issue on the way: `plugins.Manager.Start()` **hard-requires**
+a `SubsonicRouter` to have been set via `SetSubsonicRouter()` first (SubsonicAPI host functions
+call back into it) — the log message when it's missing misleadingly says `"Plugin manager
+requires DataStore to be configured"`, which cost real debugging time chasing the wrong field.
+The only place that wires a router is the wire-generated `GetPluginManager(ctx)` helper
+(`cmd/wire_injectors.go`), which also calls `CreateSubsonicAPIRouter(ctx)` — so despite the
+original design intent of keeping the scan subprocess a *lightweight* process (per
+`scanner/external.go`'s own doc comment), there's no way to get a plugin-manager that can
+actually `Start()` without also pulling in the Subsonic router construction. That's an accepted
+cost, not a bug to re-litigate: building the router doesn't bind a network port, it just adds to
+the subprocess's in-memory dependency graph.
+
+**Standing lesson for this project**: a plugin capability being correctly wired in
+`cmd/wire_injectors.go`/`allProviders` is necessary but not sufficient — always verify a new
+scan-time hook actually fires against a *real* triggered scan (HTTP `startScan` or the watcher),
+not just a direct `scanner.New(...)` call in a test or a manual CLI `navidrome scan` invocation.
+Verified the fix by rebuilding, wiping the local scratch DB, enabling `silence-marker`, and
+confirming real `media_marker` rows appeared after an HTTP-triggered full scan over ~166 real
+podcast tracks (157/166 got at least one marker via genuine `ffmpeg silencedetect` output).
+
+## Phase 4 build notes (2026-08-09) — speech/music discrimination (`SpeechMusicDetect`)
+
+Added a fourth host function, `SpeechMusicDetect`, following the same shape as `SilenceDetect`/
+`Fingerprint` — but a different kind of external dependency. ffmpeg and `fpcalc` are each a
+single binary; [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter) is a
+Python/TensorFlow package, so the host wraps a **configured Python interpreter**
+(`InaSpeechPythonPath` / `ND_INASPEECHPYTHONPATH`) rather than a PATH-discovered binary — there's
+deliberately no fallback default, since a bare `python3` almost never has it installed and
+running against the wrong interpreter would fail deep inside a Python traceback instead of a
+clear "not configured" error.
+
+Two build gotchas worth remembering for any future subprocess-wrapped Python tool in this
+project:
+- **Keras writes its own progress lines directly to file descriptor 1** during
+  `model.predict()`, regardless of `verbose` settings on some versions — redirecting
+  `sys.stdout` in Python doesn't catch this, since it's a raw fd write. The embedded
+  `segment.py` helper redirects fd 1 itself (`os.dup2` to `os.devnull`) around the
+  classification call and restores it before printing the JSON result, so the Go side's
+  `cmd.Output()` (which only captures stdout) sees pure JSON.
+- **Model downloads happen transparently on first use per venv** (inaSpeechSegmenter fetches its
+  CNN weights from GitHub releases the first time `Segmenter()` runs), not at `pip install` time
+  — first real classification call after a fresh venv install is slower and needs outbound
+  network access once.
+
+The `speech-music-marker` example plugin turns the leading/trailing run of speech segments
+around a track's music into `skip/intro_speech` / `skip/outro_speech` — both kinds were already
+reserved in `KINDS.md` before this plugin existed, so no schema doc change was needed. It only
+emits a marker when the track has a `music` segment at all (a talk-only episode has nothing to
+skip into/out of) and only when the leading/trailing run actually contains a speech segment (a
+leading `noise`/`noEnergy` run with no speech is `silence-marker`'s job, not double-marked here).
+
+Verified end-to-end in the same local scratch setup as the production-bug fix above, against two
+real podcast tracks: a mostly-spoken episode correctly got `skip/outro_speech` for its trailing
+speech run after a brief music burst (and correctly got *no* intro marker — its leading segment
+was classified `noise`, not speech); a pure-music track got neither marker, as expected.
+
 ## Sources
 
 Navidrome plugin docs · Plugin capabilities · getBookmarks entry-shape bug #1099 ·

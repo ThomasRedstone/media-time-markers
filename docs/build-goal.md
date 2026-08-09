@@ -186,6 +186,20 @@ Track its migration (detect the new extension via `getOpenSubsonicExtensions`, m
       2026-08-08 — media-time-markers push was explicitly approved and kept private;
       navidrome/navidrome's feat/media-markers branch stays local, no upstream discussion opened).
 
+## Post-v1 additions (beyond this brief's original scope)
+
+- **Production bug found + fixed (2026-08-08)**: `MediaMarkerProvider` plugins never actually ran
+  during real (non-test) scans, because `cmd/scan.go`'s `runScanner()` — the code path every real
+  scan trigger actually goes through, since `conf.Server.DevExternalScanner` defaults to `true` —
+  hardcoded a nil plugin loader. See `docs/architecture.md`'s "Production bug found + fixed"
+  section for the full root cause and fix. Verified via a real HTTP-triggered scan over ~166 real
+  podcast tracks pulled from a PinePods deployment.
+- **Phase 4: speech/music discrimination (2026-08-09)**: a new `SpeechMusicDetect` host function
+  (inaSpeechSegmenter-backed) plus a `speech-music-marker` example plugin producing
+  `skip/intro_speech`/`skip/outro_speech` markers — see `docs/architecture.md`'s "Phase 4 build
+  notes" section. Verified against real podcast audio in the same local scratch setup used for
+  the production-bug fix above.
+
 ## Explicitly deferred (do not build unless asked)
 
 - Automatic cross-episode intro detection via audio fingerprint matching (Jellyfin
