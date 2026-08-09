@@ -14,11 +14,10 @@
 
 const fs = require("fs");
 const path = require("path");
-const { execFile } = require("child_process");
-const { promisify } = require("util");
 const { shardPath } = require("./lib/shard");
+const { fingerprintFile, lookupAcoustId } = require("./lib/acoustid");
+const { loadOrInitDoc, upsertMarker } = require("./lib/markerdoc");
 
-const execFileAsync = promisify(execFile);
 const REPO_ROOT = path.resolve(__dirname, "..");
 
 function parseArgs(argv) {
@@ -36,69 +35,6 @@ function parseArgs(argv) {
     }
   }
   return args;
-}
-
-async function fingerprintFile(filePath) {
-  let stdout;
-  try {
-    ({ stdout } = await execFileAsync("fpcalc", ["-json", filePath]));
-  } catch (e) {
-    if (e.code === "ENOENT") {
-      throw new Error(
-        "fpcalc not found on PATH. Install chromaprint tools (e.g. `apt install libchromaprint-tools`) first."
-      );
-    }
-    throw new Error(`fpcalc failed: ${e.message}`);
-  }
-  const parsed = JSON.parse(stdout);
-  return { fingerprint: parsed.fingerprint, durationSec: parsed.duration };
-}
-
-async function lookupAcoustId(apiKey, fingerprint, durationSec) {
-  const url = new URL("https://api.acoustid.org/v2/lookup");
-  url.searchParams.set("client", apiKey);
-  url.searchParams.set("meta", "recordingids");
-  url.searchParams.set("duration", String(Math.round(durationSec)));
-  url.searchParams.set("fingerprint", fingerprint);
-
-  const res = await fetch(url, { method: "GET" });
-  if (!res.ok) {
-    throw new Error(`AcoustID lookup HTTP ${res.status}: ${await res.text()}`);
-  }
-  const body = await res.json();
-  if (body.status !== "ok") {
-    throw new Error(`AcoustID lookup error: ${JSON.stringify(body)}`);
-  }
-  if (!body.results || body.results.length === 0) {
-    throw new Error(
-      "No AcoustID match for this file. It may not be in AcoustID's database yet " +
-        "(submit it at https://acoustid.org/submit first), or the fingerprint is too short/noisy to match."
-    );
-  }
-  // Highest-scoring result wins.
-  const best = body.results.reduce((a, b) => (b.score > (a?.score ?? -1) ? b : a), null);
-  return best.id;
-}
-
-function loadOrInitDoc(absPath, acoustid, durationMs) {
-  if (fs.existsSync(absPath)) {
-    const doc = JSON.parse(fs.readFileSync(absPath, "utf8"));
-    if (doc.acoustid !== acoustid) {
-      throw new Error(`existing file at ${absPath} has acoustid ${doc.acoustid}, expected ${acoustid}`);
-    }
-    return doc;
-  }
-  return { acoustid, duration_ms: durationMs, schema_version: 1, markers: [] };
-}
-
-function upsertMarker(doc, marker) {
-  const idx = doc.markers.findIndex((m) => m.kind === marker.kind && m.start_ms === marker.start_ms);
-  if (idx >= 0) {
-    doc.markers[idx] = marker;
-  } else {
-    doc.markers.push(marker);
-  }
-  doc.markers.sort((a, b) => a.kind.localeCompare(b.kind) || a.start_ms - b.start_ms);
 }
 
 async function main() {

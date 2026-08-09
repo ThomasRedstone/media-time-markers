@@ -1,0 +1,13 @@
+{
+  "acoustid": "28a37d21-015a-4068-9557-1adca2165885",
+  "duration_ms": 3466720,
+  "schema_version": 1,
+  "markers": [
+    {
+      "kind": "skip/trail_silence",
+      "start_ms": 3461021,
+      "end_ms": 3466710,
+      "source": "plugin:silence-marker"
+    }
+  ]
+}
