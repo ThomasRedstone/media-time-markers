@@ -19,7 +19,15 @@
 //   ACOUSTID_API_KEY=xxx node scripts/import-from-navidrome.js \
 //     --db ~/navidrome-scratch/nd-data/navidrome.db \
 //     --music-folder ~/navidrome-scratch/podcasts-local \
-//     [--dry-run]
+//     [--dry-run] [--submit-missing]
+//
+// --submit-missing: for a track with NO existing AcoustID fingerprint (the common case for
+// niche/podcast content — see docs/architecture.md), submit its fingerprint to AcoustID's
+// shared database instead of just skipping it, so it becomes matchable in the future. Requires
+// ACOUSTID_USER_API_KEY — a *personal* key from your own AcoustID account page, distinct from
+// the application key in ACOUSTID_API_KEY. Submissions are queued on AcoustID's end and
+// typically aren't matchable via lookup for a while (hours to days) — re-run this script
+// (without --submit-missing) later to pick up ones that have since become matchable.
 //
 // Requires `fpcalc` and `sqlite3` on PATH, and a free AcoustID API key.
 
@@ -27,7 +35,7 @@ const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 const { shardPath } = require("./lib/shard");
-const { fingerprintFile, lookupAcoustId } = require("./lib/acoustid");
+const { fingerprintFile, lookupAcoustId, submitFingerprint, NoMatchError } = require("./lib/acoustid");
 const { loadOrInitDoc, upsertMarker } = require("./lib/markerdoc");
 
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -56,6 +64,7 @@ function parseArgs(argv) {
 function queryMarkers(dbPath) {
   const sql = `
     select mf.path as path, mf.duration as durationSec, mf.title as title,
+           mf.artist as artist, mf.album as album,
            mm.kind as kind, mm.start_ms as startMs, mm.end_ms as endMs,
            mm.source as source, mm.confidence as confidence
     from media_marker mm
@@ -71,7 +80,15 @@ function queryMarkers(dbPath) {
 function groupByTrack(rows) {
   const byPath = new Map();
   for (const row of rows) {
-    if (!byPath.has(row.path)) byPath.set(row.path, { title: row.title, durationSec: row.durationSec, markers: [] });
+    if (!byPath.has(row.path)) {
+      byPath.set(row.path, {
+        title: row.title,
+        artist: row.artist,
+        album: row.album,
+        durationSec: row.durationSec,
+        markers: [],
+      });
+    }
     byPath.get(row.path).markers.push({
       kind: row.kind,
       start_ms: row.startMs,
@@ -104,6 +121,15 @@ async function main() {
     process.exit(1);
   }
 
+  const submitMissing = args["submit-missing"] === true;
+  const userApiKey = process.env.ACOUSTID_USER_API_KEY;
+  if (submitMissing && !userApiKey) {
+    console.error(
+      "--submit-missing requires ACOUSTID_USER_API_KEY (a personal key from your AcoustID account page, distinct from ACOUSTID_API_KEY)."
+    );
+    process.exit(1);
+  }
+
   const dbPath = path.resolve(args.db);
   const musicFolder = path.resolve(args["music-folder"]);
   const dryRun = args["dry-run"] === true;
@@ -114,6 +140,7 @@ async function main() {
   console.log(`Found ${rows.length} marker(s) across ${byTrack.size} track(s).`);
 
   let written = 0;
+  let submitted = 0;
   let skipped = 0;
   let i = 0;
   for (const [relPath, track] of byTrack) {
@@ -129,7 +156,31 @@ async function main() {
 
     try {
       const { fingerprint, durationSec } = await fingerprintFile(filePath);
-      const acoustid = await lookupAcoustId(apiKey, fingerprint, durationSec);
+
+      let acoustid;
+      try {
+        acoustid = await lookupAcoustId(apiKey, fingerprint, durationSec);
+      } catch (e) {
+        if (e instanceof NoMatchError && submitMissing) {
+          if (dryRun) {
+            console.log("SUBMIT (dry-run, no match)");
+            submitted++;
+            await sleep(LOOKUP_DELAY_MS);
+            continue;
+          }
+          const result = await submitFingerprint(apiKey, userApiKey, fingerprint, durationSec, {
+            track: track.title,
+            artist: track.artist,
+            album: track.album,
+          });
+          console.log(`SUBMITTED (id=${result.id}, status=${result.status}) — not matchable yet`);
+          submitted++;
+          await sleep(LOOKUP_DELAY_MS);
+          continue;
+        }
+        throw e;
+      }
+
       const relDataPath = shardPath(acoustid);
       const absDataPath = path.join(REPO_ROOT, relDataPath);
       const durationMs = Math.round(durationSec * 1000);
@@ -153,9 +204,14 @@ async function main() {
     await sleep(LOOKUP_DELAY_MS);
   }
 
-  console.log(`\nDone: ${written} track(s) written, ${skipped} skipped.`);
+  console.log(`\nDone: ${written} track(s) written, ${submitted} submitted to AcoustID, ${skipped} skipped.`);
   if (!dryRun && written > 0) {
     console.log("Run scripts/validate.js and scripts/build-index.js, then review and git add/commit.");
+  }
+  if (!dryRun && submitted > 0) {
+    console.log(
+      "Submitted tracks aren't matchable yet — re-run this script (without --submit-missing) in a while to pick them up once AcoustID processes them."
+    );
   }
 }
 
