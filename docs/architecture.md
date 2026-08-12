@@ -306,6 +306,63 @@ real podcast tracks: a mostly-spoken episode correctly got `skip/outro_speech` f
 speech run after a brief music burst (and correctly got *no* intro marker — its leading segment
 was classified `noise`, not speech); a pure-music track got neither marker, as expected.
 
+## Phase 4 addendum (2026-08-12) — talk-over-a-beat was invisible; Demucs vocal separation fixes it
+
+Running `speech-music-marker` at real production scale (249 real podcast tracks, not 2 sample
+tracks) surfaced two real problems in sequence, both now fixed:
+
+**1. 100% timeout failure rate at scale.** `SpeechMusicDetect` calls the classifier over a
+track's *entire* duration; the host function's 30s call timeout was never going to survive a
+20-70 minute episode, and every single one of 242 real invocations failed with "context deadline
+exceeded". Fixed by bounding classification to just the leading/trailing `WINDOW_SEC` (150s) of
+each track via `ffmpeg`-extracted clips — this plugin only ever cares about the edges anyway.
+Re-verified clean: 0/249 timeouts on a full rescan.
+
+**2. Talk-over-a-beat is invisible to both the classifier and a dedicated VAD model.** Once the
+timeout was fixed, coverage was still suspiciously low — the user's own listening confirmed most
+"silent" workout-mix episodes actually do have a spoken intro, just delivered *over* a continuous
+beat from second one, not in a clean silence→speech→music sequence. Verified directly: on a real
+track with known spoken content, inaSpeechSegmenter's frame-level output in that region was
+statistically indistinguishable from pure music (same mean/p90/p99 as a control region with no
+speech at all). Swapping in [Silero VAD][silero] (ONNX, no Python subprocess — a much faster,
+architecturally cleaner alternative that was explored specifically to sidestep this) didn't help
+either: same result, near-zero voice probability throughout the same known-speech region, even
+though the underlying audio unambiguously had substantial energy there (confirmed via raw RMS).
+Classical harmonic-percussive source separation (`librosa.effects.hpss`) didn't help either — a
+beat's bass/synth content is plenty harmonic, so HPSS doesn't cleanly separate "voice" from "beat"
+the way genre-specific source separation does.
+
+**The fix**: running the track through [Demucs][demucs] (`--two-stems=vocals`) *before*
+classification. Verified directly: the isolated vocal stem's RMS energy jumps from ~0.0005
+(nearly silent) to ~0.15-0.30 exactly where a human listener confirms the talking starts — a
+clean, unambiguous signal once the beat is removed. Demucs runs at roughly 5-6x realtime on CPU,
+which dominates the per-call cost (a 150s window takes ~30s for Demucs alone, versus
+inaSpeechSegmenter's own ~15-20s) — so the plugin's manifest now declares `timeoutSeconds: 150`
+(a new, generally-available manifest field — see `plugins/README.md`) rather than trying to claw
+back time elsewhere.
+
+**A second, more subtle bug fell out of combining these two fixes**: `speech-music-marker`'s
+original marker logic found the "intro"/"outro" boundary by searching the *combined* lead+trail
+segment list for a `music`-labeled segment. That assumption silently broke once both fixes
+landed together — windowing means the combined list has two disjoint time ranges, not one
+continuous timeline, and vocal-isolated audio essentially never produces a `music` label at all
+(there's no music left in an isolated vocal stem to classify). Caught before it shipped broken:
+manually traced through a real track's output and found the bug would have produced a
+`skip/intro_speech` marker spanning from 0ms to 3,793,689ms — nearly the entire 63-minute track.
+Fixed by tagging each segment with which window it came from (`lead`/`trail`, a new field on the
+host response) and having the plugin process each window's segments independently, never
+crossing between them. Re-verified against the same track: the marker now correctly reads
+0-119,060ms, bounded by the window, not the bug's near-full-track span.
+
+**Standing lesson for this project**: verify at real production scale before trusting a "looks
+right" 2-track smoke test — both the timeout failure and the talk-over-a-beat blindness were
+completely invisible in this session's earlier 2-track verification, and only showed up against
+the real 249-track library. A synthetic or hand-picked test set can hide exactly the failure
+modes that matter.
+
+[silero]: https://github.com/snakers4/silero-vad
+[demucs]: https://github.com/facebookresearch/demucs
+
 ## Sources
 
 Navidrome plugin docs · Plugin capabilities · getBookmarks entry-shape bug #1099 ·

@@ -199,6 +199,13 @@ Track its migration (detect the new extension via `getOpenSubsonicExtensions`, m
   `skip/intro_speech`/`skip/outro_speech` markers — see `docs/architecture.md`'s "Phase 4 build
   notes" section. Verified against real podcast audio in the same local scratch setup used for
   the production-bug fix above.
+- **Phase 4 addendum (2026-08-12)**: real production-scale testing (249 tracks, not 2) found two
+  real bugs the 2-track smoke test had hidden — a 100% timeout failure rate, and talk-over-a-beat
+  content being invisible to both the classifier and a dedicated VAD model. Fixed by bounding
+  classification to a leading/trailing window and running it through Demucs vocal separation
+  first; a related per-window marker-boundary bug (would have produced a marker spanning nearly
+  an entire 63-minute track) was caught and fixed before shipping. See `docs/architecture.md`'s
+  "Phase 4 addendum" section.
 
 ## Explicitly deferred (do not build unless asked)
 
