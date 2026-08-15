@@ -188,6 +188,15 @@ async function main() {
       const doc = loadOrInitDoc(absDataPath, acoustid, durationMs);
       for (const marker of track.markers) upsertMarker(doc, marker);
 
+      // fpcalc's own duration measurement (durationMs, from this run) and whatever produced
+      // the marker's own end_ms (Navidrome's separately-measured track duration) can disagree
+      // by a handful of ms on VBR-encoded files — different tools, different estimates of the
+      // same nominal length. Keep duration_ms self-consistent with the markers actually being
+      // written rather than failing validation over a measurement discrepancy neither side is
+      // "wrong" about.
+      const maxMarkerEnd = Math.max(0, ...doc.markers.map((m) => m.end_ms ?? m.start_ms));
+      if (maxMarkerEnd > doc.duration_ms) doc.duration_ms = maxMarkerEnd;
+
       if (dryRun) {
         console.log(`OK (dry-run) -> ${acoustid}, ${track.markers.length} marker(s)`);
       } else {
