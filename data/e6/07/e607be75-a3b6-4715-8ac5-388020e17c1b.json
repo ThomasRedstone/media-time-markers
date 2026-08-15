@@ -1,0 +1,19 @@
+{
+  "acoustid": "e607be75-a3b6-4715-8ac5-388020e17c1b",
+  "duration_ms": 4153190,
+  "schema_version": 1,
+  "markers": [
+    {
+      "kind": "skip/intro_speech",
+      "start_ms": 0,
+      "end_ms": 198160,
+      "source": "plugin:speech-music-marker"
+    },
+    {
+      "kind": "skip/trail_silence",
+      "start_ms": 4125762,
+      "end_ms": 4153190,
+      "source": "plugin:silence-marker"
+    }
+  ]
+}

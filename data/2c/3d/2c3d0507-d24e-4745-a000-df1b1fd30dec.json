@@ -1,0 +1,31 @@
+{
+  "acoustid": "2c3d0507-d24e-4745-a000-df1b1fd30dec",
+  "duration_ms": 2762820,
+  "schema_version": 1,
+  "markers": [
+    {
+      "kind": "skip/intro_speech",
+      "start_ms": 0,
+      "end_ms": 136520,
+      "source": "plugin:speech-music-marker"
+    },
+    {
+      "kind": "skip/outro_speech",
+      "start_ms": 2588899,
+      "end_ms": 2762820,
+      "source": "plugin:speech-music-marker"
+    },
+    {
+      "kind": "skip/outro_speech",
+      "start_ms": 2588919,
+      "end_ms": 2762820,
+      "source": "plugin:speech-music-marker"
+    },
+    {
+      "kind": "skip/trail_silence",
+      "start_ms": 2761650,
+      "end_ms": 2762820,
+      "source": "plugin:silence-marker"
+    }
+  ]
+}

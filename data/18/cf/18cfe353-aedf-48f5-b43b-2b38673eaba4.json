@@ -1,0 +1,13 @@
+{
+  "acoustid": "18cfe353-aedf-48f5-b43b-2b38673eaba4",
+  "duration_ms": 1454210,
+  "schema_version": 1,
+  "markers": [
+    {
+      "kind": "skip/intro_speech",
+      "start_ms": 0,
+      "end_ms": 106740,
+      "source": "plugin:speech-music-marker"
+    }
+  ]
+}

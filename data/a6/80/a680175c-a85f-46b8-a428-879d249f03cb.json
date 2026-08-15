@@ -1,0 +1,25 @@
+{
+  "acoustid": "a680175c-a85f-46b8-a428-879d249f03cb",
+  "duration_ms": 2742710,
+  "schema_version": 1,
+  "markers": [
+    {
+      "kind": "skip/intro_speech",
+      "start_ms": 0,
+      "end_ms": 128060,
+      "source": "plugin:speech-music-marker"
+    },
+    {
+      "kind": "skip/outro_speech",
+      "start_ms": 2690648,
+      "end_ms": 2742700,
+      "source": "plugin:speech-music-marker"
+    },
+    {
+      "kind": "skip/trail_silence",
+      "start_ms": 2741664,
+      "end_ms": 2742700,
+      "source": "plugin:silence-marker"
+    }
+  ]
+}

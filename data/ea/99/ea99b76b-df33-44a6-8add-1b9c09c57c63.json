@@ -4,10 +4,22 @@
   "schema_version": 1,
   "markers": [
     {
+      "kind": "skip/intro_speech",
+      "start_ms": 0,
+      "end_ms": 116720,
+      "source": "plugin:speech-music-marker"
+    },
+    {
       "kind": "skip/lead_silence",
       "start_ms": 0,
       "end_ms": 662,
       "source": "plugin:silence-marker"
+    },
+    {
+      "kind": "skip/outro_speech",
+      "start_ms": 1757295,
+      "end_ms": 1792630,
+      "source": "plugin:speech-music-marker"
     },
     {
       "kind": "skip/trail_silence",

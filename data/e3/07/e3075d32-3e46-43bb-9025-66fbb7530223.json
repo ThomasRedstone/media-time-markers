@@ -4,6 +4,12 @@
   "schema_version": 1,
   "markers": [
     {
+      "kind": "skip/intro_speech",
+      "start_ms": 0,
+      "end_ms": 137020,
+      "source": "plugin:speech-music-marker"
+    },
+    {
       "kind": "skip/trail_silence",
       "start_ms": 1955524,
       "end_ms": 1956050,
